@@ -11,6 +11,8 @@
     "bulma": "^0.7.2",
     "bulma-extensions": "^4.0.0",
     "d3-delaunay": "^4.1.5",
+    "d3-polygon": "^1.0.5",
+    "lodash": "^4.17.11",
     "print-js": "^1.0.54",
     "svg.js": "^2.7.1",
     "vue": "^2.5.17"

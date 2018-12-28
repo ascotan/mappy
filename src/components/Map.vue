@@ -20,13 +20,14 @@ export default {
       },
       svgContainer: null,
       scale: 1.0,
-      showOverlay: true
+      showOverlay: true,
+      voroniPolys: 300
     }
   },
   mounted: function() {
     this.createImage();
-    this.createOverlay(this.scale);
-    this.createPoints();
+    //this.createOverlay(this.scale);
+    this.createMap();
   },
   created: function() {
     this.$root.$on('print', () => {
@@ -101,19 +102,21 @@ export default {
       ]);
       polygon.fill('none').stroke({width:2, color: '#ccc'}).addClass('grid');
     },
-    createPoints: function() {
-        let points = MapGenerator.GeneratePoints(1000,
-        {width: this.svgAttr.viewBoxWidth, height: this.svgAttr.viewBoxHeight});
-        points.forEach((point) => {
-          this.svgContainer.circle(2).attr({cx: point[0], cy: point[1]}).fill('black');
-        })
-
-        let polyGenerator = MapGenerator.GeneratePolys(points, {width: this.svgAttr.viewBoxWidth, height: this.svgAttr.viewBoxHeight});
-        var poly = polyGenerator.next()
-        while (poly.done != true) {
-          this.svgContainer.polyline(poly.value).stroke({width: 2, color: '#ccc'}).fill('none');
-          poly = polyGenerator.next();
+    createMap: function() {
+      var extent = {width: this.svgAttr.viewBoxWidth, height: this.svgAttr.viewBoxHeight};
+      let points = MapGenerator.GeneratePoints(this.voroniPolys, extent);
+      var mesh = MapGenerator.GenerateMesh(points, extent);
+      var mesh, n = MapGenerator.GenerateHeightMap(mesh);
+      mesh.polys.forEach((poly) => {
+        this.svgContainer.polyline(poly.points).stroke({width: 2, color: '#ccc'}).fill(MapGenerator.ColorizeHeight(poly.height));
+        if (poly.height == 1000) {
+          this.svgContainer.circle(20).attr({cx: poly.centroid[0], cy: poly.centroid[1]}).stroke({width: 2, color: '#ccc'}).fill('black');
         }
+      });
+      n.forEach((m) => {
+        this.svgContainer.circle(20).attr({cx: m[0], cy: m[1]}).stroke({width: 2, color: '#ccc'}).fill('red');
+      });
+
     }
   }
 }

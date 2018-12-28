@@ -1,7 +1,7 @@
 <template>
   <div class="box">
-    <figure id="image" classs="image">
-      <div :id="svgId" class="svg-container"></div>
+    <figure id="image" class="svg-container">
+      <div :id="svgId" class="svg-content"></div>
     </figure>
   </div>
 </template>
@@ -16,18 +16,26 @@ export default {
         viewBoxWidth: 3300,
         viewBoxHeight: 2550
       },
-      svgContainer: null
+      svgContainer: null,
+      scale: .5
     }
   },
   mounted: function() {
     this.createImage();
     // this.createRect(this.createPath());
-    this.createOverlay();
+    this.createOverlay(this.scale);
   },
   created: function() {
     this.$root.$on('print', () => {
-      this.$print("image", "html");
-    })
+      this.$print({
+        printable: "image",
+        type: "html"
+      });
+    });
+    this.$root.$on('changeScale', (scale) => {
+      this.scale = scale * 0.01;
+      this.updateViewbox();
+    });
   },
   methods: {
     createImage: function() {
@@ -35,11 +43,17 @@ export default {
       this.svgContainer = image;
       this.svgContainer.rect("100%", "100%").fill('none').stroke({width:3, color: '#ccc'})
     },
-    createOverlay: function() {
-      const startx = 150;
-      const starty = 130;
-      const cols = Math.ceil(this.svgAttr.viewBoxWidth / 225);
-      const rows = Math.ceil(this.svgAttr.viewBoxHeight / 260);
+    updateViewbox: function() {
+      this.svgContainer.select('polygon.grid').each(function() {
+        this.remove();
+      });
+      this.createOverlay(this.scale);
+    },
+    createOverlay: function(scale) {
+      const startx = 150 * scale;
+      const starty = 130 * scale;
+      const cols = Math.ceil(this.svgAttr.viewBoxWidth / (225 * scale));
+      const rows = Math.ceil(this.svgAttr.viewBoxHeight / (260 * scale));
 
       let x = startx;
       let y = starty;
@@ -47,30 +61,30 @@ export default {
         // start the next col offset vertically depending on wether
         // it's even/odd
         if (c % 2) {
-          y = starty + 130;
+          y = starty + (130 * scale);
         } else {
           y = starty;
         }
 
         // draw out the overlay hexs
         for (let r = 0; r < rows; r++) {
-          this.createHexagon(x, y);
-          y += 260
+          this.createHexagon(x, y, scale);
+          y += (260 * scale)
         }
-        x +=225
+        x += (225 * scale)
       }
     },
-    createHexagon: function(x, y) {
+    createHexagon: function(x, y, scale) {
       // x and y are the center of the hexagon
       const polygon = this.svgContainer.polygon([
-        [(x + 150), y],
-        [(x + 75 ), (y + 130)],
-        [(x - 75), (y + 130)],
-        [(x - 150),y],
-        [(x - 75), (y - 130)],
-        [(x + 75), (y - 130)]
+        [(x + (150 * scale)), y],
+        [(x + (75 * scale)), (y + (130*scale))],
+        [(x - (75 * scale)), (y + (130 * scale))],
+        [(x - (150 * scale)),y],
+        [(x - (75 * scale)), (y - (130 * scale))],
+        [(x + (75 * scale)), (y - (130 * scale))]
       ]);
-      polygon.fill('none').stroke({width:2, color: '#ccc'});
+      polygon.fill('none').stroke({width:2, color: '#ccc'}).addClass('grid');
     }
   }
 }

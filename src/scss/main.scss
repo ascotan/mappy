@@ -24,3 +24,6 @@ $body-background-color: $beige-lighter;
 $control-border-width: 2px;
 $input-border-color: transparent;
 $input-shadow: none;
+
+@import "bulma";
+@import "node_modules/bulma-extensions/bulma-slider/dist/css/bulma-slider";

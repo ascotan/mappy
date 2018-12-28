@@ -1,10 +1,10 @@
+const resolve = require('resolve');
 module.exports = {
   css: {
     loaderOptions: {
       sass: {
         data: `
-          @import "@/scss/_variables.scss";
-          @import "bulma/bulma.sass";
+          @import "@/scss/main.scss";
         `
       }
     }

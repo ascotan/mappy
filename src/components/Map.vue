@@ -7,6 +7,8 @@
 </template>
 
 <script>
+import {MapGenerator} from '../map.js'
+
 export default {
   name: 'map',
   data: function() {
@@ -17,13 +19,14 @@ export default {
         viewBoxHeight: 2550
       },
       svgContainer: null,
-      scale: .5
+      scale: 1.0,
+      showOverlay: true
     }
   },
   mounted: function() {
     this.createImage();
-    // this.createRect(this.createPath());
     this.createOverlay(this.scale);
+    this.createPoints();
   },
   created: function() {
     this.$root.$on('print', () => {
@@ -34,7 +37,11 @@ export default {
     });
     this.$root.$on('changeScale', (scale) => {
       this.scale = scale * 0.01;
-      this.updateViewbox();
+      this.updateOverlayScale();
+    });
+    this.$root.$on('changeOverlayVisbility', (visible) => {
+      this.showOverlay = visible;
+      this.toggleOverlay();
     });
   },
   methods: {
@@ -43,11 +50,19 @@ export default {
       this.svgContainer = image;
       this.svgContainer.rect("100%", "100%").fill('none').stroke({width:3, color: '#ccc'})
     },
-    updateViewbox: function() {
-      this.svgContainer.select('polygon.grid').each(function() {
-        this.remove();
-      });
-      this.createOverlay(this.scale);
+    updateOverlayScale: function() {
+        this.svgContainer.select('polygon.grid').each(function() {
+          this.remove();
+        });
+        this.createOverlay(this.scale);
+        this.toggleOverlay();
+    },
+    toggleOverlay: function() {
+      if (this.showOverlay) {
+        this.svgContainer.select('polygon.grid').show();
+      } else {
+        this.svgContainer.select('polygon.grid').hide();
+      }
     },
     createOverlay: function(scale) {
       const startx = 150 * scale;
@@ -85,6 +100,20 @@ export default {
         [(x + (75 * scale)), (y - (130 * scale))]
       ]);
       polygon.fill('none').stroke({width:2, color: '#ccc'}).addClass('grid');
+    },
+    createPoints: function() {
+        let points = MapGenerator.GeneratePoints(1000,
+        {width: this.svgAttr.viewBoxWidth, height: this.svgAttr.viewBoxHeight});
+        points.forEach((point) => {
+          this.svgContainer.circle(2).attr({cx: point[0], cy: point[1]}).fill('black');
+        })
+
+        let polyGenerator = MapGenerator.GeneratePolys(points, {width: this.svgAttr.viewBoxWidth, height: this.svgAttr.viewBoxHeight});
+        var poly = polyGenerator.next()
+        while (poly.done != true) {
+          this.svgContainer.polyline(poly.value).stroke({width: 2, color: '#ccc'}).fill('none');
+          poly = polyGenerator.next();
+        }
     }
   }
 }

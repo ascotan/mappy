@@ -4,6 +4,14 @@
         Tools
       </p>
       <div class="panel-block">
+        <div class="control">
+          <label class="checkbox">
+            <input type="checkbox" v-model="showOverlay" @input="changeOverlayVisbility">
+            Show Overlay
+          </label>
+        </div>
+      </div>
+      <div class="panel-block">
           <div class="control">
             <label class="label">Overlay Scale</label>
             <input class="slider is-fullwidth" step="10" min="40" max="120" value="60" type="range" v-model="scale" @input="changeScale">
@@ -25,8 +33,12 @@ export default {
     name: 'sidebar',
     data: function() {
       return {
-        scale: 100
+        scale: 100,
+        showOverlay: true
       }
+    },
+    created() {
+      this.changeScale();
     },
     methods: {
       print: function() {
@@ -34,6 +46,9 @@ export default {
       },
       changeScale: function() {
         this.$root.$emit('changeScale', this.scale);
+      },
+      changeOverlayVisbility: function() {
+        this.$root.$emit('changeOverlayVisbility', !this.showOverlay);
       }
     }
 }

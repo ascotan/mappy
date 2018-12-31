@@ -21,7 +21,7 @@ export default {
       svgContainer: null,
       scale: 1.0,
       showOverlay: true,
-      voroniPolys: 300
+      voroniPolys: 3000
     }
   },
   mounted: function() {
@@ -106,16 +106,19 @@ export default {
       var extent = {width: this.svgAttr.viewBoxWidth, height: this.svgAttr.viewBoxHeight};
       let points = MapGenerator.GeneratePoints(this.voroniPolys, extent);
       var mesh = MapGenerator.GenerateMesh(points, extent);
-      var mesh, n = MapGenerator.GenerateHeightMap(mesh);
+      var mesh= MapGenerator.GenerateHeightMap(mesh);
       mesh.polys.forEach((poly) => {
-        this.svgContainer.polyline(poly.points).stroke({width: 2, color: '#ccc'}).fill(MapGenerator.ColorizeHeight(poly.height));
-        if (poly.height == 1000) {
-          this.svgContainer.circle(20).attr({cx: poly.centroid[0], cy: poly.centroid[1]}).stroke({width: 2, color: '#ccc'}).fill('black');
-        }
+        this.svgContainer.polyline(poly.points).stroke({width: 2, color: '#ccc'}).fill(MapGenerator.ColorizeHeight(poly.height)).data('poly', poly).on('click', function(poly) {
+            console.log(this.data('poly'));
+            console.log(MapGenerator.ColorizeHeight(this.data('poly').height));
+        });
+        // if (poly.bump) {
+        //   this.svgContainer.circle(20).attr({cx: poly.centroid[0], cy: poly.centroid[1]}).stroke({width: 2, color: '#ccc'}).fill('red');
+        // }
       });
-      n.forEach((m) => {
-        this.svgContainer.circle(20).attr({cx: m[0], cy: m[1]}).stroke({width: 2, color: '#ccc'}).fill('red');
-      });
+      // n.forEach((m) => {
+      //   this.svgContainer.circle(20).attr({cx: m[0], cy: m[1]}).stroke({width: 2, color: '#ccc'}).fill('red');
+      // });
 
     }
   }

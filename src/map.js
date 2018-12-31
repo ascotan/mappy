@@ -5,6 +5,8 @@ import {Delaunay} from "d3-delaunay";
 
 var MapGenerator = (function() {
     var relaxIterations = 2;
+    var maxHeight = 1000;
+    var minHeight = -maxHeight;
 
     function createRandomPoints(n, extent) {
         // create a random set of points
@@ -55,7 +57,8 @@ var MapGenerator = (function() {
             voroni: null,
             polys: [],
             dxhash: {},
-            dyhash: {}
+            dyhash: {},
+            bump: false
         };
 
         // add all the polygons
@@ -86,36 +89,73 @@ var MapGenerator = (function() {
         return mesh;
     }
 
-    function addBump(mesh) {
+    function addBump(mesh, radius, value) {
         var index = randomPolyIndex(mesh);
-        mesh.polys[index].height = 1000;
-        var n = neighbors(mesh, index);
-        return mesh, n
+        var target = mesh.polys[index];
+
+        // set the target height
+        target.height = clamp(minHeight, maxHeight, target.height + value);
+
+        var neighbors = centroidNeighbors(mesh, target.centroid, radius);
+        // for every neighbor in the radius, get their new height
+        neighbors.forEach((neighbor) => {
+            let height = sigmoidDistance(neighbor.distance, radius) * value;
+            // make sure to add the new height to the height they already have
+            neighbor.poly.height = clamp(minHeight, maxHeight,
+                neighbor.poly.height + height);
+        });
+        target.bump = true;
+        return mesh
+    }
+
+    function clamp(min, max, number) {
+        return Math.min(Math.max(number, min), max);
+    }
+
+    function getRandomHeight() {
+      return Math.floor(Math.random() * (maxHeight - minHeight)) + minHeight;
+    }
+
+    // clamps the distance from center to between 5/-5 and returns the s curve value
+    // returns a number between 0 and 1 where 1 = at the center and 0 = at the radius
+    function sigmoidDistance(distance, radius) {
+        var x = 5 - (distance/(radius * .1));
+        var s =  1 / (1 + Math.exp(-x));
+        return s
+    }
+
+    // return all the centroids that are within a radius
+    // return is {distance from origin:poly}
+    function centroidNeighbors(mesh, point, radius) {
+        var polys = _.reduce(mesh.polys, function(result, poly) {
+            let a = poly.centroid[0] - point[0];
+            let b = poly.centroid[1] - point[1];
+            let distance = Math.sqrt(a * a + b * b);
+            if (distance <= radius && !_.isEqual(poly.centroid, point)) {
+                result.push({
+                    distance: distance,
+                    poly: poly
+                });
+            }
+            return result;
+        }, []);
+        return polys
     }
 
     function randomPolyIndex(mesh) {
         return Math.round(Math.random() * mesh.polys.length);
     }
 
-    function neighbors(mesh, index) {
-        var poly = mesh.polys[index];
-        var neighbors = [];
-        mesh.polys.forEach((other, i) => {
-            if (_.intersection(other.points, poly.points).length > 0) {
-                console.log(other);
-                neighbors.push(i);
-            }
-        })
-        return neighbors;
-    }
-
     // get a hex color from a height
     // assumes that heights are clamped to -1000 to 1000
     function heightToColor(height) {
-        var r = 125 + (125 * (height * .001));
-        var g = 125 + (125 * (height * .001));
-        var b = 125 + (125 * (height * .001));
-        return "#" + (r).toString(16) + (g).toString(16) + (b).toString(16);
+        var r = Math.round(125 + (125 * (height * (1/maxHeight))));
+        var g = Math.round(125 + (125 * (height * (1/maxHeight))));
+        var b = Math.round(125 + (125 * (height * (1/maxHeight))));
+        // make sure there is a "0" infront of small numbers
+        return "#" + ("0" + (r).toString(16)).slice(-2) +
+                     ("0" + (g).toString(16)).slice(-2) +
+                     ("0" + (b).toString(16)).slice(-2);
     }
 
     return {
@@ -127,7 +167,9 @@ var MapGenerator = (function() {
             return buildBaseMesh(points, extent);
         },
         GenerateHeightMap: (mesh) => {
-            mesh = addBump(mesh);
+            for (let x = 0; x < 50; x++) {
+              mesh = addBump(mesh, 600, getRandomHeight());
+            }
             return mesh;
         },
         ColorizeHeight: (height) => {

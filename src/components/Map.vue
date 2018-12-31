@@ -1,5 +1,20 @@
 <template>
   <div class="box">
+    <!-- overlay modal -->
+    <div class="modal" :class="{'is-active': processing}">
+      <div class="modal-background"></div>
+      <div class="modal-content">
+        <div class="box">
+          <div class="media">
+            <span class="icon is-small media-left">
+              <i class="fas fa-cog fa-pulse"></i>
+            </span>
+            <span class="media-content">Generating Map...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <figure id="image" class="svg-container">
       <div :id="svgId" class="svg-content"></div>
     </figure>
@@ -8,6 +23,8 @@
 
 <script>
 import {MapGenerator} from '../map.js'
+import {OverlayGenerator} from '../overlay.js'
+import {Utils} from '../utils.js'
 
 export default {
   name: 'map',
@@ -21,12 +38,13 @@ export default {
       svgContainer: null,
       scale: 1.0,
       showOverlay: true,
-      voroniPolys: 3000
+      voroniPolys: 3000,
+      processing: false
     }
   },
   mounted: function() {
     this.createImage();
-    //this.createOverlay(this.scale);
+    this.createOverlay(this.scale);
     this.createMap();
   },
   created: function() {
@@ -44,8 +62,15 @@ export default {
       this.showOverlay = visible;
       this.toggleOverlay();
     });
+    this.$root.$on('generate', () => {
+      this.createMap();
+    });
   },
   methods: {
+    toggleModal: function(event) {
+      alert('got it');
+      this.generating = !this.generating;
+    },
     createImage: function() {
       const image = this.$svg('map').size('100%', '100%').viewbox(0, 0, this.svgAttr.viewBoxWidth, this.svgAttr.viewBoxHeight);
       this.svgContainer = image;
@@ -66,52 +91,22 @@ export default {
       }
     },
     createOverlay: function(scale) {
-      const startx = 150 * scale;
-      const starty = 130 * scale;
-      const cols = Math.ceil(this.svgAttr.viewBoxWidth / (225 * scale));
-      const rows = Math.ceil(this.svgAttr.viewBoxHeight / (260 * scale));
-
-      let x = startx;
-      let y = starty;
-      for (let c = 0; c < cols; c++) {
-        // start the next col offset vertically depending on wether
-        // it's even/odd
-        if (c % 2) {
-          y = starty + (130 * scale);
-        } else {
-          y = starty;
-        }
-
-        // draw out the overlay hexs
-        for (let r = 0; r < rows; r++) {
-          this.createHexagon(x, y, scale);
-          y += (260 * scale)
-        }
-        x += (225 * scale)
-      }
+      var polys = OverlayGenerator.CreateOverlayPolygons(
+        this.svgAttr.viewBoxWidth, this.svgAttr.viewBoxHeight, scale);
+      polys.forEach((poly) => {
+        this.svgContainer.polygon(poly).fill('none').stroke({width:2, color: '#ccc'}).addClass('grid')
+      });
     },
-    createHexagon: function(x, y, scale) {
-      // x and y are the center of the hexagon
-      const polygon = this.svgContainer.polygon([
-        [(x + (150 * scale)), y],
-        [(x + (75 * scale)), (y + (130*scale))],
-        [(x - (75 * scale)), (y + (130 * scale))],
-        [(x - (150 * scale)),y],
-        [(x - (75 * scale)), (y - (130 * scale))],
-        [(x + (75 * scale)), (y - (130 * scale))]
-      ]);
-      polygon.fill('none').stroke({width:2, color: '#ccc'}).addClass('grid');
-    },
-    createMap: function() {
+    createMap: async function() {
+      this.processing = true;
+      await Utils.Sleep(100); // hack to draw the overlay
       var extent = {width: this.svgAttr.viewBoxWidth, height: this.svgAttr.viewBoxHeight};
       let points = MapGenerator.GeneratePoints(this.voroniPolys, extent);
       var mesh = MapGenerator.GenerateMesh(points, extent);
       var mesh= MapGenerator.GenerateHeightMap(mesh);
+
       mesh.polys.forEach((poly) => {
-        this.svgContainer.polyline(poly.points).stroke({width: 2, color: '#ccc'}).fill(MapGenerator.ColorizeHeight(poly.height)).data('poly', poly).on('click', function(poly) {
-            console.log(this.data('poly'));
-            console.log(MapGenerator.ColorizeHeight(this.data('poly').height));
-        });
+        this.svgContainer.polyline(poly.points).stroke({width: 2, color: '#ccc'}).fill(Utils.ColorizeHeight(poly.height, MapGenerator.MaxHeight));
         // if (poly.bump) {
         //   this.svgContainer.circle(20).attr({cx: poly.centroid[0], cy: poly.centroid[1]}).stroke({width: 2, color: '#ccc'}).fill('red');
         // }
@@ -119,7 +114,7 @@ export default {
       // n.forEach((m) => {
       //   this.svgContainer.circle(20).attr({cx: m[0], cy: m[1]}).stroke({width: 2, color: '#ccc'}).fill('red');
       // });
-
+      this.processing = false;
     }
   }
 }

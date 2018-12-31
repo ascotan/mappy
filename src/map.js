@@ -2,6 +2,7 @@
 
 var _ = require('lodash')
 import {Delaunay} from "d3-delaunay";
+import {Utils} from './utils.js';
 
 var MapGenerator = (function() {
     var relaxIterations = 2;
@@ -94,26 +95,18 @@ var MapGenerator = (function() {
         var target = mesh.polys[index];
 
         // set the target height
-        target.height = clamp(minHeight, maxHeight, target.height + value);
+        target.height = Utils.Clamp(minHeight, maxHeight, target.height + value);
 
         var neighbors = centroidNeighbors(mesh, target.centroid, radius);
         // for every neighbor in the radius, get their new height
         neighbors.forEach((neighbor) => {
             let height = sigmoidDistance(neighbor.distance, radius) * value;
             // make sure to add the new height to the height they already have
-            neighbor.poly.height = clamp(minHeight, maxHeight,
+            neighbor.poly.height = Utils.Clamp(minHeight, maxHeight,
                 neighbor.poly.height + height);
         });
         target.bump = true;
         return mesh
-    }
-
-    function clamp(min, max, number) {
-        return Math.min(Math.max(number, min), max);
-    }
-
-    function getRandomHeight() {
-      return Math.floor(Math.random() * (maxHeight - minHeight)) + minHeight;
     }
 
     // clamps the distance from center to between 5/-5 and returns the s curve value
@@ -146,19 +139,8 @@ var MapGenerator = (function() {
         return Math.round(Math.random() * mesh.polys.length);
     }
 
-    // get a hex color from a height
-    // assumes that heights are clamped to -1000 to 1000
-    function heightToColor(height) {
-        var r = Math.round(125 + (125 * (height * (1/maxHeight))));
-        var g = Math.round(125 + (125 * (height * (1/maxHeight))));
-        var b = Math.round(125 + (125 * (height * (1/maxHeight))));
-        // make sure there is a "0" infront of small numbers
-        return "#" + ("0" + (r).toString(16)).slice(-2) +
-                     ("0" + (g).toString(16)).slice(-2) +
-                     ("0" + (b).toString(16)).slice(-2);
-    }
-
     return {
+        MaxHeight: maxHeight,
         GeneratePoints: (number, extent) => {
             return relaxPoints(
                 createRandomPoints(number, extent), extent);
@@ -168,12 +150,9 @@ var MapGenerator = (function() {
         },
         GenerateHeightMap: (mesh) => {
             for (let x = 0; x < 50; x++) {
-              mesh = addBump(mesh, 600, getRandomHeight());
+              mesh = addBump(mesh, 600, Utils.RandomRange(minHeight, maxHeight));
             }
             return mesh;
-        },
-        ColorizeHeight: (height) => {
-            return heightToColor(height);
         }
     }
 

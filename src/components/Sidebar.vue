@@ -18,6 +18,14 @@
           </div>
       </div>
       <div class="panel-block">
+        <a class="button is-fullwidth" v-on:click="generate" >
+          <span class="icon is-small">
+            <i class="fas fa-map"></i>
+          </span>
+          <span>Generate</span>
+        </a>
+      </div>
+      <div class="panel-block">
         <a class="button is-fullwidth" v-on:click="print">
           <span class="icon is-small">
             <i class="fas fa-print"></i>
@@ -43,6 +51,9 @@ export default {
     methods: {
       print: function() {
         this.$root.$emit('print');
+      },
+      generate: function() {
+        this.$root.$emit('generate');
       },
       changeScale: function() {
         this.$root.$emit('changeScale', this.scale);

@@ -1,8 +1,8 @@
 "use strict";
 
-var _ = require('lodash')
+var _ = require('lodash');
 import {Delaunay} from "d3-delaunay";
-import {Utils} from './utils.js';
+import {Hull} from './hull.js';
 
 var MapGenerator = (function() {
     var relaxIterations = 2;
@@ -57,8 +57,6 @@ var MapGenerator = (function() {
         var mesh = {
             voroni: null,
             polys: [],
-            dxhash: {},
-            dyhash: {},
             bump: false
         };
 
@@ -75,35 +73,32 @@ var MapGenerator = (function() {
         // each polygon has a centroid, a set of points to define
         // it's hull and a height (for a heightmap)
         polys.forEach((pnts, index) => {
+            var edges = [];
+            for(let x = 0; x < pnts.length-1; x++) {
+                edges.push([pnts[x], pnts[x+1]])
+            }
             mesh.polys.push({
                 centroid: points[index],
-                points: pnts,
+                edges: edges,
                 height: 0
             });
         })
-
-        // create a hashtable for centroids based on delta x and y
-        mesh.polys.forEach((poly, index) => {
-            mesh.dxhash[poly.centroid[0]] = index;
-            mesh.dyhash[poly.centroid[1]] = index;
-        });
         return mesh;
     }
 
     function addBump(mesh, radius, value) {
-        var index = randomPolyIndex(mesh);
+        var index = _.random(0, mesh.polys.length - 1);
         var target = mesh.polys[index];
 
         // set the target height
-        target.height = Utils.Clamp(minHeight, maxHeight, target.height + value);
+        target.height = _.clamp(target.height + value, minHeight, maxHeight);
 
         var neighbors = centroidNeighbors(mesh, target.centroid, radius);
         // for every neighbor in the radius, get their new height
         neighbors.forEach((neighbor) => {
             let height = sigmoidDistance(neighbor.distance, radius) * value;
             // make sure to add the new height to the height they already have
-            neighbor.poly.height = Utils.Clamp(minHeight, maxHeight,
-                neighbor.poly.height + height);
+            neighbor.poly.height = _.clamp(neighbor.poly.height + height, minHeight, maxHeight);
         });
         target.bump = true;
         return mesh
@@ -135,10 +130,6 @@ var MapGenerator = (function() {
         return polys
     }
 
-    function randomPolyIndex(mesh) {
-        return Math.round(Math.random() * mesh.polys.length);
-    }
-
     return {
         MaxHeight: maxHeight,
         GeneratePoints: (number, extent) => {
@@ -150,9 +141,30 @@ var MapGenerator = (function() {
         },
         GenerateHeightMap: (mesh) => {
             for (let x = 0; x < 50; x++) {
-              mesh = addBump(mesh, 600, Utils.RandomRange(minHeight, maxHeight));
+              mesh = addBump(mesh, 600, _.random(minHeight, maxHeight));
             }
             return mesh;
+        },
+        GetHull: (mesh) => {
+            // get all polygons with a height > 0
+            var polys = _.filter(mesh.polys, function(poly) {
+                return poly.height > 0;
+            });
+
+            var edges = {};
+            var count = 0;
+            polys.forEach((poly) => {
+                poly.edges.forEach((edge) => {
+                    edges[edge] = edge;
+                    count++;
+                });
+            });
+            // console.log(edges);
+            // edges = _.values(edges);
+            // console.log(edges.length, count);
+            // console.log(edges);
+
+           return [];
         }
     }
 

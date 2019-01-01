@@ -6,7 +6,7 @@
             <Sidebar/>
           </div>
           <div class="column">
-            <Map/>
+            <MapImage/>
           </div>
         </div>
       </div>
@@ -15,13 +15,13 @@
 
 <script>
 import Sidebar from './Sidebar.vue'
-import Map from './Map.vue'
+import MapImage from './MapImage.vue'
 
 export default {
-  name: 'main',
+  name: 'maincontent',
   components: {
     Sidebar,
-    Map
+    MapImage
   }
 }
 </script>

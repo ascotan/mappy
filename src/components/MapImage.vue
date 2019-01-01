@@ -27,27 +27,29 @@ import {OverlayGenerator} from '../overlay.js'
 import {Utils} from '../utils.js'
 
 export default {
-  name: 'map',
+  name: 'mapimage',
   data: function() {
     return {
       svgId: "map",
       svgAttr: {
         viewBoxWidth: 3300,
-        viewBoxHeight: 2550
+        viewBoxHeight: 2550,
+        polys: 3000,
+        drawCentroids: false
+      },
+      overlayAttr: {
+        scale: 1.0,
+        visible: true
       },
       svgContainer: null,
-      scale: 1.0,
-      showOverlay: true,
-      voroniPolys: 3000,
       processing: false
     }
   },
   mounted: function() {
     this.createImage();
-    this.createOverlay(this.scale);
+    this.createOverlay(this.overlayAttr.scale);
     this.createMap();
-  },
-  created: function() {
+
     this.$root.$on('print', () => {
       this.$print({
         printable: "image",
@@ -55,11 +57,11 @@ export default {
       });
     });
     this.$root.$on('changeScale', (scale) => {
-      this.scale = scale * 0.01;
+      this.overlayAttr.scale = scale * 0.01;
       this.updateOverlayScale();
     });
     this.$root.$on('changeOverlayVisbility', (visible) => {
-      this.showOverlay = visible;
+      this.overlayAttr.visible = visible;
       this.toggleOverlay();
     });
     this.$root.$on('generate', () => {
@@ -67,10 +69,6 @@ export default {
     });
   },
   methods: {
-    toggleModal: function(event) {
-      alert('got it');
-      this.generating = !this.generating;
-    },
     createImage: function() {
       const image = this.$svg('map').size('100%', '100%').viewbox(0, 0, this.svgAttr.viewBoxWidth, this.svgAttr.viewBoxHeight);
       this.svgContainer = image;
@@ -80,11 +78,11 @@ export default {
         this.svgContainer.select('polygon.grid').each(function() {
           this.remove();
         });
-        this.createOverlay(this.scale);
+        this.createOverlay(this.overlayAttr.scale);
         this.toggleOverlay();
     },
     toggleOverlay: function() {
-      if (this.showOverlay) {
+      if (this.overlayAttr.visible) {
         this.svgContainer.select('polygon.grid').show();
       } else {
         this.svgContainer.select('polygon.grid').hide();
@@ -97,24 +95,32 @@ export default {
         this.svgContainer.polygon(poly).fill('none').stroke({width:2, color: '#ccc'}).addClass('grid')
       });
     },
-    createMap: async function() {
+    createMap: function() {
       this.processing = true;
-      await Utils.Sleep(100); // hack to draw the overlay
-      var extent = {width: this.svgAttr.viewBoxWidth, height: this.svgAttr.viewBoxHeight};
-      let points = MapGenerator.GeneratePoints(this.voroniPolys, extent);
-      var mesh = MapGenerator.GenerateMesh(points, extent);
-      var mesh= MapGenerator.GenerateHeightMap(mesh);
 
-      mesh.polys.forEach((poly) => {
-        this.svgContainer.polyline(poly.points).stroke({width: 2, color: '#ccc'}).fill(Utils.ColorizeHeight(poly.height, MapGenerator.MaxHeight));
-        // if (poly.bump) {
-        //   this.svgContainer.circle(20).attr({cx: poly.centroid[0], cy: poly.centroid[1]}).stroke({width: 2, color: '#ccc'}).fill('red');
-        // }
-      });
-      // n.forEach((m) => {
-      //   this.svgContainer.circle(20).attr({cx: m[0], cy: m[1]}).stroke({width: 2, color: '#ccc'}).fill('red');
-      // });
-      this.processing = false;
+      var extent = {width: this.svgAttr.viewBoxWidth, height: this.svgAttr.viewBoxHeight};
+      let points = MapGenerator.GeneratePoints(this.svgAttr.polys, extent);
+      var mesh = MapGenerator.GenerateMesh(points, extent);
+      mesh = MapGenerator.GenerateHeightMap(mesh);
+      var hull = MapGenerator.GetHull(mesh);
+
+      _.delay(() => { // Because javascript...
+        mesh.polys.forEach((poly) => {
+          let color = 'none';
+          let width = 0;
+          if (poly.height > 0) {
+            color = 'red';
+            width = 2;
+          }
+          this.svgContainer.polyline(_.flatten(poly.edges)).stroke({width: width, color: color}).fill(Utils.ColorizeHeight(poly.height, MapGenerator.MaxHeight));
+          if (this.svgAttr.drawCentroids){
+            this.svgContainer.circle(10).attr({cx: poly.centroid[0], cy: poly.centroid[1]}).fill('red');
+          }
+        });
+        //this.svgContainer.polyline(hull).stroke({width: 10, color: 'blue'});
+      }, 100);
+
+      _.delay(() => {this.processing = false;}, 100);
     }
   }
 }

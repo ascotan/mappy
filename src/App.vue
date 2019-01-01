@@ -1,21 +1,21 @@
 <template>
   <div id="app">
     <Navigation/>
-    <Main/>
-    <Footer/>
+    <MainContent/>
+    <PageFooter/>
   </div>
 </template>
 
 <script>
 import Navigation from './components/Navigation.vue'
-import Footer from './components/Footer.vue'
-import Main from './components/Main.vue'
+import PageFooter from './components/PageFooter.vue'
+import MainContent from './components/MainContent.vue'
 
 export default {
   name: 'app',
   components: {
-    Footer,
-    Main,
+    PageFooter,
+    MainContent,
     Navigation
   }
 }

@@ -16,26 +16,13 @@ var Utils = (function() {
                      ("0" + (b).toString(16)).slice(-2);
     }
 
-    function clamp(min, max, number) {
-        return Math.min(Math.max(number, min), max);
-    }
-
-    function getRandomRange(min, max) {
-      return Math.floor(Math.random() * (max - min)) + min;
-    }
-
     function sleep(ms) {
       return new Promise(resolve => setTimeout(resolve, ms));
     }
+
     return {
         ColorizeHeight: (height, maxHeight) => {
             return heightToColor(height, maxHeight);
-        },
-        Clamp: (min, max, number) => {
-          return clamp(min, max, number);
-        },
-        RandomRange: (min, max) => {
-          return getRandomRange(min, max);
         },
         Sleep: (ms) => {
           return sleep(ms);

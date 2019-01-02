@@ -1,7 +1,5 @@
 "use strict";
 
-var _ = require('lodash')
-
 var Utils = (function() {
 
     // get a hex color from a height
@@ -16,16 +14,9 @@ var Utils = (function() {
                      ("0" + (b).toString(16)).slice(-2);
     }
 
-    function sleep(ms) {
-      return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
     return {
         ColorizeHeight: (height, maxHeight) => {
             return heightToColor(height, maxHeight);
-        },
-        Sleep: (ms) => {
-          return sleep(ms);
         }
     }
 

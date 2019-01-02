@@ -1,7 +1,7 @@
 <template>
   <div class="box">
     <!-- overlay modal -->
-    <div class="modal" :class="{'is-active': processing}">
+    <div class="modal" :class="{'is-active': drawing}">
       <div class="modal-background"></div>
       <div class="modal-content">
         <div class="box">
@@ -22,9 +22,12 @@
 </template>
 
 <script>
+var _ = require('lodash');
 import {MapGenerator} from '../map.js'
 import {OverlayGenerator} from '../overlay.js'
 import {Utils} from '../utils.js'
+import { mapMutations } from 'vuex'
+import { mapState } from 'vuex'
 
 export default {
   name: 'mapimage',
@@ -34,22 +37,27 @@ export default {
       svgAttr: {
         viewBoxWidth: 3300,
         viewBoxHeight: 2550,
-        polys: 3000,
-        drawCentroids: false
+        polys: 5000,
+        drawCentroids: true,
+        drawHeightMap: true
       },
       overlayAttr: {
         scale: 1.0,
         visible: true
       },
-      svgContainer: null,
-      processing: false
+      svgContainer: null
     }
   },
+  computed: mapState([
+    'drawing'
+  ]),
   mounted: function() {
     this.createImage();
     this.createOverlay(this.overlayAttr.scale);
     this.createMap();
-
+  },
+  created: function() {
+    // because $root is everyone's parent - thx javascript
     this.$root.$on('print', () => {
       this.$print({
         printable: "image",
@@ -69,6 +77,10 @@ export default {
     });
   },
   methods: {
+    ...mapMutations({
+      startDraw: 'START_DRAW',
+      stopDraw: 'STOP_DRAW'
+    }),
     createImage: function() {
       const image = this.$svg('map').size('100%', '100%').viewbox(0, 0, this.svgAttr.viewBoxWidth, this.svgAttr.viewBoxHeight);
       this.svgContainer = image;
@@ -96,31 +108,39 @@ export default {
       });
     },
     createMap: function() {
-      this.processing = true;
+      this.startDraw();
 
+      // clean out old data
+      var all = this.svgContainer.select('*');
+      all.members.forEach((item) => {
+        item.remove();
+      });
+
+      // get map data
       var extent = {width: this.svgAttr.viewBoxWidth, height: this.svgAttr.viewBoxHeight};
       let points = MapGenerator.GeneratePoints(this.svgAttr.polys, extent);
       var mesh = MapGenerator.GenerateMesh(points, extent);
-      mesh = MapGenerator.GenerateHeightMap(mesh);
-      var hull = MapGenerator.GetHull(mesh);
+      mesh = MapGenerator.GenerateHeightMap(mesh, 50, 600);
 
-      _.delay(() => { // Because javascript...
+      // draw the voroni diagram + heighmap
+      if (this.svgAttr.drawHeightMap) {
         mesh.polys.forEach((poly) => {
-          let color = 'none';
-          let width = 0;
-          if (poly.height > 0) {
-            color = 'red';
-            width = 2;
-          }
-          this.svgContainer.polyline(_.flatten(poly.edges)).stroke({width: width, color: color}).fill(Utils.ColorizeHeight(poly.height, MapGenerator.MaxHeight));
+          this.svgContainer.polyline(_.flatten(poly.edges)).fill(Utils.ColorizeHeight(poly.height, MapGenerator.MaxHeight));
           if (this.svgAttr.drawCentroids){
             this.svgContainer.circle(10).attr({cx: poly.centroid[0], cy: poly.centroid[1]}).fill('red');
           }
         });
-        //this.svgContainer.polyline(hull).stroke({width: 10, color: 'blue'});
-      }, 100);
+      }
 
-      _.delay(() => {this.processing = false;}, 100);
+      // drop topgraphic lines
+      for (let x = 0; x <= MapGenerator.MaxHeight; x += 250) {
+        var hull = MapGenerator.GetHull(mesh, x);
+        hull.forEach((edge) => {
+          this.svgContainer.polyline(edge).stroke({width: 5, color: 'black'});
+        });
+      }
+
+      this.stopDraw();
     }
   }
 }

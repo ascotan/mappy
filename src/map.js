@@ -2,7 +2,6 @@
 
 var _ = require('lodash');
 import {Delaunay} from "d3-delaunay";
-import {Hull} from './hull.js';
 
 var MapGenerator = (function() {
     var relaxIterations = 2;
@@ -130,6 +129,31 @@ var MapGenerator = (function() {
         return polys
     }
 
+    function getHull(mesh, height) {
+        // get all polygons with a height > some input
+        var polys = _.filter(mesh.polys, function(poly) {
+            return poly.height > height;
+        });
+
+        // get all the edges
+        var edges = [];
+        polys.forEach((poly) => {
+            edges = _.concat(edges, poly.edges);
+        });
+
+        // find all the duplicate edges and pull them from the set
+        var uniqEdges = _.uniqWith(edges, isEdgeSame);
+        var dupes = _.xorWith(edges, uniqEdges);
+        edges = _.pullAllWith(edges, dupes, isEdgeSame);
+
+       return edges;
+    }
+
+    function isEdgeSame(value, other) {
+        return (value[0][0] == other[0][0] && value[0][1] == other[0][1] && value[1][0] == other[1][0] && value[1][1] == other[1][1]) ||
+               (value[1][0] == other[0][0] && value[1][1] == other[0][1] && value[0][0] == other[1][0] && value[0][1] == other[1][1])
+    }
+
     return {
         MaxHeight: maxHeight,
         GeneratePoints: (number, extent) => {
@@ -139,32 +163,15 @@ var MapGenerator = (function() {
         GenerateMesh: (points, extent) => {
             return buildBaseMesh(points, extent);
         },
-        GenerateHeightMap: (mesh) => {
-            for (let x = 0; x < 50; x++) {
-              mesh = addBump(mesh, 600, _.random(minHeight, maxHeight));
+        GenerateHeightMap: (mesh, bumps, radius) => {
+            // bumps are fine for now - heightmap can be improve bigtime
+            for (let x = 0; x < bumps; x++) {
+              mesh = addBump(mesh, radius, _.random(minHeight, maxHeight));
             }
             return mesh;
         },
-        GetHull: (mesh) => {
-            // get all polygons with a height > 0
-            var polys = _.filter(mesh.polys, function(poly) {
-                return poly.height > 0;
-            });
-
-            var edges = {};
-            var count = 0;
-            polys.forEach((poly) => {
-                poly.edges.forEach((edge) => {
-                    edges[edge] = edge;
-                    count++;
-                });
-            });
-            // console.log(edges);
-            // edges = _.values(edges);
-            // console.log(edges.length, count);
-            // console.log(edges);
-
-           return [];
+        GetHull: (mesh, height) => {
+            return getHull(mesh, height);
         }
     }
 

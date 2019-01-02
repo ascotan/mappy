@@ -38,8 +38,13 @@ export default {
         viewBoxWidth: 3300,
         viewBoxHeight: 2550,
         polys: 5000,
-        drawCentroids: true,
-        drawHeightMap: true
+        drawCentroids: false,
+        drawHeightMap: true,
+        bumpmap: {
+          bumps: 50,
+          minRadius: 100,
+          maxRadius: 1500
+        }
       },
       overlayAttr: {
         scale: 1.0,
@@ -120,20 +125,21 @@ export default {
       var extent = {width: this.svgAttr.viewBoxWidth, height: this.svgAttr.viewBoxHeight};
       let points = MapGenerator.GeneratePoints(this.svgAttr.polys, extent);
       var mesh = MapGenerator.GenerateMesh(points, extent);
-      mesh = MapGenerator.GenerateHeightMap(mesh, 50, 600);
+      mesh = MapGenerator.GenerateHeightMap(mesh, this.svgAttr.bumpmap.bumps, this.svgAttr.bumpmap.minRadius, this.svgAttr.bumpmap.maxRadius);
+      mesh = MapGenerator.GetWater(mesh);
 
       // draw the voroni diagram + heighmap
       if (this.svgAttr.drawHeightMap) {
         mesh.polys.forEach((poly) => {
           this.svgContainer.polyline(_.flatten(poly.edges)).fill(Utils.ColorizeHeight(poly.height, MapGenerator.MaxHeight));
           if (this.svgAttr.drawCentroids){
-            this.svgContainer.circle(10).attr({cx: poly.centroid[0], cy: poly.centroid[1]}).fill('red');
+             this.svgContainer.circle(5).attr({cx: poly.centroid[0], cy: poly.centroid[1]}).fill('red');
           }
         });
       }
 
       // drop topgraphic lines
-      for (let x = 0; x <= MapGenerator.MaxHeight; x += 250) {
+      for (let x = 0; x <= MapGenerator.MaxHeight; x += 1000) {
         var hull = MapGenerator.GetHull(mesh, x);
         hull.forEach((edge) => {
           this.svgContainer.polyline(edge).stroke({width: 5, color: 'black'});

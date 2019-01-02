@@ -2,6 +2,7 @@
 
 var _ = require('lodash');
 import {Delaunay} from "d3-delaunay";
+import {Utils} from './utils.js'
 
 var MapGenerator = (function() {
     var relaxIterations = 2;
@@ -73,12 +74,18 @@ var MapGenerator = (function() {
         // it's hull and a height (for a heightmap)
         polys.forEach((pnts, index) => {
             var edges = [];
+            var edgesSorted = [];
             for(let x = 0; x < pnts.length-1; x++) {
-                edges.push([pnts[x], pnts[x+1]])
+                // sort the cordinates of the edge by x then y
+                // this keeps all edges looking the same
+                edges.push([pnts[x], pnts[x+1]]);
+                edgesSorted.push(_.sortBy([pnts[x], pnts[x+1]],
+                    [function(o) {return o[0];}, function(o) { return o[1];}]));
             }
             mesh.polys.push({
                 centroid: points[index],
                 edges: edges,
+                edgesSorted: edgesSorted,
                 height: 0
             });
         })
@@ -138,20 +145,30 @@ var MapGenerator = (function() {
         // get all the edges
         var edges = [];
         polys.forEach((poly) => {
-            edges = _.concat(edges, poly.edges);
+            edges = _.concat(edges, poly.edgesSorted);
         });
+        edges = _.sortBy(edges,
+                    [function(o) {return o[0][0];}, function(o) {return o[0][1];},
+                     function(o) {return o[1][0];}, function(o) {return o[1][1];}]);
 
-        // find all the duplicate edges and pull them from the set
-        var uniqEdges = _.uniqWith(edges, isEdgeSame);
+        // old hashing trick; because _.uniqWith is way to slow
+        var dict = {}
+        edges.forEach((edge) => {
+            dict[edge] = edge;
+        });
+        var uniqEdges = _.values(dict);
         var dupes = _.xorWith(edges, uniqEdges);
-        edges = _.pullAllWith(edges, dupes, isEdgeSame);
+
+        // difference between dupes and edges is the hull
+        // and yes lodash is again to slow...
+        edges = Utils.Difference(edges, dupes);
 
        return edges;
     }
 
     function isEdgeSame(value, other) {
-        return (value[0][0] == other[0][0] && value[0][1] == other[0][1] && value[1][0] == other[1][0] && value[1][1] == other[1][1]) ||
-               (value[1][0] == other[0][0] && value[1][1] == other[0][1] && value[0][0] == other[1][0] && value[0][1] == other[1][1])
+        return value[0][0] == other[0][0] && value[0][1] == other[0][1] &&
+                value[1][0] == other[1][0] && value[1][1] == other[1][1]
     }
 
     return {
@@ -163,15 +180,18 @@ var MapGenerator = (function() {
         GenerateMesh: (points, extent) => {
             return buildBaseMesh(points, extent);
         },
-        GenerateHeightMap: (mesh, bumps, radius) => {
+        GenerateHeightMap: (mesh, bumps, maxRadius, minRadius) => {
             // bumps are fine for now - heightmap can be improve bigtime
             for (let x = 0; x < bumps; x++) {
-              mesh = addBump(mesh, radius, _.random(minHeight, maxHeight));
+              mesh = addBump(mesh, _.random(maxRadius, minRadius), _.random(minHeight, maxHeight));
             }
             return mesh;
         },
         GetHull: (mesh, height) => {
             return getHull(mesh, height);
+        },
+        GetWater: (mesh) => {
+            return mesh;
         }
     }
 

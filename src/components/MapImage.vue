@@ -161,15 +161,14 @@ export default {
 
         // this code is still broken - needs work
         paths.forEach((path) => {
-          let line = this.svgContainer.path(path).stroke({width: 7, color: 'blue'}).fill('none');
+          let line = this.svgContainer.path(path).stroke({width: 7, color: 'black'}).fill('none');
           if (!this.drawBoundaries) {
             line.hide();
           }
+          line.on('click', function(event) {
+            this.hide();
+          });
         });
-
-        // hull.forEach((edge) => {
-        //   this.svgContainer.polyline(edge).stroke({width: 3, color: 'black'}).addClass('hull');
-        // });
       }
 
       // var water = MapGenerator.GetWater(mesh);
@@ -192,3 +191,5 @@ export default {
     width: 100%;
   }
 </style>
+
+

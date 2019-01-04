@@ -1,5 +1,14 @@
 # mappy
 
+This project builds fantasy terrain as an SVG image that can be scaled or printed.  Inspiration
+for this project comes from:
+
+- https://mewo2.com/notes/terrain/
+- http://www-cs-students.stanford.edu/~amitp/game-programming/polygon-map-generation/
+
+Obviously i'm terrible at naming things. Maybe I'll fix that at some point. The code is all client side.
+
+
 ## Project setup
 ```
 npm install

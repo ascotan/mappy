@@ -2,10 +2,9 @@
 
 var _ = require('lodash');
 import {Delaunay} from "d3-delaunay";
-import {Utils} from './utils.js'
 
 var MapGenerator = (function() {
-    var relaxIterations = 2;
+    var relaxIterations = 10;
     var maxHeight = 1000;
     var minHeight = -maxHeight;
 
@@ -78,9 +77,9 @@ var MapGenerator = (function() {
             for(let x = 0; x < pnts.length-1; x++) {
                 // sort the cordinates of the edge by x then y
                 // this keeps all edges looking the same
-                edges.push([pnts[x], pnts[x+1]]);
+                edges.push([pnts[x], pnts[x+1]].toString());
                 edgesSorted.push(_.sortBy([pnts[x], pnts[x+1]],
-                    [function(o) {return o[0];}, function(o) { return o[1];}]));
+                    [function(o) {return o[0];}, function(o) { return o[1];}]).toString());
             }
             mesh.polys.push({
                 centroid: points[index],
@@ -136,39 +135,145 @@ var MapGenerator = (function() {
         return polys
     }
 
+    function edgeToPoints(edge) {
+        let line = edge.split(',');
+        return [
+            line[0]+ " " +line[1],
+            line[2]+ " " +line[3]
+        ]
+    }
+
+    function polylineToPaths(hull) {
+        // construct a hash of all points on the polyline
+        // and the 2 points they're connected to
+        var hash = {};
+        hull.forEach((edge) => {
+            let values = edge.split(',');
+            let p1 = values[0] + " " + values[1];
+            let p2 = values[2] + " " + values[3];
+            if (_.has(hash, p1)) {
+                if (!hash[p1].includes(p2)) {
+                    hash[p1].push(p2);
+                }
+            } else {
+                hash[p1] = [p2];
+            }
+            if (_.has(hash, p2)) {
+                if (!hash[p2].includes(p1)) {
+                    hash[p2].push(p1);
+                }
+            } else {
+                hash[p2] = [p1];
+            }
+        });
+
+        // extract all the paths from the polyline
+        var paths = [];
+        var points = _.keys(hash);
+        var seen = [];
+
+        // there may be multiple paths in the polyline
+        while(points.length > 0) {
+            var path = [];
+
+            // pick the first point as the start of the path
+            var start = points[0];
+            var prev = "";
+            var next = start;
+
+            var count = 0;
+            var flag = true;
+            while((next != start && count < points.length) || flag) {
+                // capture the path point
+                path.push(next);
+                seen.push(next);
+
+                // pull the 2 points it's connected 2
+                let values = hash[next];
+
+                // at the first point in the path, either value is ok
+                // at the second point, we should be seeing a prev, next in the set
+                // set the next and prev for the next iteration
+                let match = "";
+                values.forEach((value) => {
+                    if (value != prev) {
+                        match = value;
+                    }
+                });
+                prev = next;
+                next = match;
+
+                // increment flags
+                count++; flag = false;
+            }
+            // connect the last and first point to close the path
+            // path.push(next);
+            // seen.push(next);
+
+            //console.log("path", path);
+
+            var stroke = "M " + path[0];
+            for (let x = 1; x < path.length; x = x + 2) {
+                if (x+1 < path.length) {
+                    stroke = stroke + " Q " + path[x] + " " + path[x+1];
+                } else {
+                    stroke = stroke + " L " + path[x];
+                }
+            }
+            stroke = stroke + " Z";
+            //console.log(stroke);
+            paths.push(stroke);
+
+            // remove the points seen from the list of points
+            points = _.difference(points, seen);
+        }
+        //console.log(paths);
+        return paths;
+    }
+
     function getHull(mesh, height) {
         // get all polygons with a height > some input
         var polys = _.filter(mesh.polys, function(poly) {
             return poly.height > height;
         });
+        if (polys.length == 0) {
+            return [];
+        }
 
         // get all the edges
         var edges = [];
         polys.forEach((poly) => {
             edges = _.concat(edges, poly.edgesSorted);
         });
-        edges = _.sortBy(edges,
-                    [function(o) {return o[0][0];}, function(o) {return o[0][1];},
-                     function(o) {return o[1][0];}, function(o) {return o[1][1];}]);
 
-        // old hashing trick; because _.uniqWith is way to slow
-        var dict = {}
-        edges.forEach((edge) => {
-            dict[edge] = edge;
+        // count how many times an edge is seen
+        var hash = {};
+        edges.forEach( function(edge) {
+            if (_.has(hash, edge)) {
+                 hash[edge]++;
+            } else {
+                hash[edge] = 1;
+            }
         });
-        var uniqEdges = _.values(dict);
-        var dupes = _.xorWith(edges, uniqEdges);
 
-        // difference between dupes and edges is the hull
-        // and yes lodash is again to slow...
-        edges = Utils.Difference(edges, dupes);
+        // create a dictiony {"times seen": [edges]} and pull back edges seen "1" time
+        var hull = _.transform(hash, function(result, value, key) {
+          (result[value] || (result[value] = [])).push(key);
+        }, {})["1"];
 
-       return edges;
+       return hull;
     }
 
-    function isEdgeSame(value, other) {
-        return value[0][0] == other[0][0] && value[0][1] == other[0][1] &&
-                value[1][0] == other[1][0] && value[1][1] == other[1][1]
+    function getWater(mesh) {
+        var edges = [];
+
+
+        mesh.polys.forEach((poly) => {
+
+        });
+
+
+       return edges;
     }
 
     return {
@@ -187,11 +292,12 @@ var MapGenerator = (function() {
             }
             return mesh;
         },
-        GetHull: (mesh, height) => {
-            return getHull(mesh, height);
+        GetBoundaries: (mesh, height) => {
+            let hull = getHull(mesh, height);
+            return polylineToPaths(hull);
         },
         GetWater: (mesh) => {
-            return mesh;
+            return getWater(mesh);
         }
     }
 

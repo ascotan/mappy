@@ -25,7 +25,6 @@
 var _ = require('lodash');
 import {MapGenerator} from '../map.js'
 import {OverlayGenerator} from '../overlay.js'
-import {Utils} from '../utils.js'
 import { mapMutations } from 'vuex'
 import { mapState } from 'vuex'
 
@@ -44,7 +43,7 @@ export default {
           maxRadius: 1500
         },
         coastlineHeight: 0,
-        topoLineHeightEvery: MapGenerator.MaxHeight
+        topoLineHeightEvery: 250
       },
       svgContainer: null
     }
@@ -146,8 +145,8 @@ export default {
       var mesh = MapGenerator.GenerateMesh(points, extent);
       mesh = MapGenerator.GenerateHeightMap(mesh, this.svgAttr.bumpmap.bumps, this.svgAttr.bumpmap.minRadius, this.svgAttr.bumpmap.maxRadius);
       // draw the voroni diagram + heighmap
-      mesh.polys.forEach((poly) => {
-        let line = this.svgContainer.polyline(_.flatten(poly.edges)).fill(Utils.ColorizeHeight(poly.height, MapGenerator.MaxHeight)).addClass('heightmap');
+      mesh.polys.forEach((poly, index) => {
+        let line = this.svgContainer.polyline(_.flatten(poly.edges)).fill(MapGenerator.ColorizeHeight(poly.height)).addClass('heightmap').data({'index': index});
         if (!this.drawHeightMap) {
           line.hide();
         }
@@ -160,11 +159,17 @@ export default {
         }
       });
 
+      // erode based on water
+      MapGenerator.Erode(mesh);
+      this.svgContainer.select('polyline.heightmap').each(function() {
+        let poly = mesh.polys[parseInt(this.data('index'))];
+        this.attr({fill: MapGenerator.ColorizeHeight(poly.height - poly.erosion)})
+      });
+
       // drop topgraphic lines
       for (let x = this.svgAttr.coastlineHeight; x <= MapGenerator.MaxHeight; x += this.svgAttr.topoLineHeightEvery) {
         var paths = MapGenerator.GetBoundaries(mesh, x);
 
-        // this code is still broken - needs work
         paths.forEach((path) => {
           let line = this.svgContainer.path(path).stroke({width: 7, color: 'black'}).fill('none');
           if (!this.drawBoundaries) {
@@ -172,11 +177,6 @@ export default {
           }
         });
       }
-
-      // var water = MapGenerator.GetWater(mesh);
-      // water.forEach((edge) => {
-      //   this.svgContainer.polyline(edge).stroke({width: 5, color: 'blue'});
-      // });
 
       this.stopDraw();
 

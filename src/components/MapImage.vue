@@ -42,7 +42,9 @@ export default {
           bumps: 50,
           minRadius: 100,
           maxRadius: 1500
-        }
+        },
+        coastlineHeight: 0,
+        topoLineHeightEvery: MapGenerator.MaxHeight
       },
       svgContainer: null
     }
@@ -149,6 +151,9 @@ export default {
         if (!this.drawHeightMap) {
           line.hide();
         }
+
+        // TODO: for some reason setting attributies on all these circles takes longer than drawing the entire
+        // map. Must have something to do with non-optimized code in svg.js
         let circle = this.svgContainer.circle(5).attr({cx: poly.centroid[0], cy: poly.centroid[1]}).fill('red');
         if (!this.drawCentroids) {
           circle.hide();
@@ -156,7 +161,7 @@ export default {
       });
 
       // drop topgraphic lines
-      for (let x = 0; x <= MapGenerator.MaxHeight; x += 1001) {
+      for (let x = this.svgAttr.coastlineHeight; x <= MapGenerator.MaxHeight; x += this.svgAttr.topoLineHeightEvery) {
         var paths = MapGenerator.GetBoundaries(mesh, x);
 
         // this code is still broken - needs work
@@ -165,9 +170,6 @@ export default {
           if (!this.drawBoundaries) {
             line.hide();
           }
-          line.on('click', function(event) {
-            this.hide();
-          });
         });
       }
 

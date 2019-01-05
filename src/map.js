@@ -143,6 +143,7 @@ var MapGenerator = (function() {
         ]
     }
 
+    // this function takes the polygon hull of a set of polygons and extracts SVG paths from it
     function polylineToPaths(hull) {
         // construct a hash of all points on the polyline
         // and the 2 points they're connected to
@@ -167,16 +168,14 @@ var MapGenerator = (function() {
             }
         });
 
-        // TODO: there are still 2 bugs here
+        // TODO: there are still a bug here
         // 1. there are periodically a single path segment that isnt' drawn - likely due to how
         // we are closing loops and where the start point is chosen
-        // 2. periodically we are getting reverse loops (x y z z y z) on the path still even
-        // though next != prev
 
         // extract all the paths from the polyline
         var paths = [];
         var points = _.keys(hash);
-        var seen = [];
+        var seen = {};
 
         // there may be multiple paths in the polyline
         while(points.length > 0) {
@@ -192,12 +191,13 @@ var MapGenerator = (function() {
 
             // next != start to prev reverse loops
             // next != start to stop forward loops
+            // _.has(seen, next) to prevent going into paths that have already been pulled out
             // flag avoids the first loop false case
             // count is for safety
-            while((next != start && next != prev && count < points.length) || flag) {
+            while((next != start && next != prev && !_.has(seen, next) && count < points.length) || flag) {
                 // capture the path point
                 path.push(next);
-                seen.push(next);
+                seen[next] = next;
 
                 // pull the 2 points it's connected 2
                 let values = hash[next];
@@ -217,29 +217,36 @@ var MapGenerator = (function() {
                 // increment flags
                 count++; flag = false;
             }
+            if (next == start) {
+                path.push(next);
+                seen[next] = next;
+            }
 
+            // start the SVG path string
             var stroke = "M " + path[0];
             for (let x = 1; x < path.length; x = x + 2) {
                 if (x+1 < path.length) {
+                    // quadradic bezier uses 2 points
+                    // first is the control point, second is the final point
                     stroke = stroke + " Q " + path[x] + " " + path[x+1];
                 } else {
                     stroke = stroke + " L " + path[x];
                 }
             }
 
-            // some paths apparently don't really close so
+            // some paths apparently don't really close so...
             if (next == start) {
                 stroke = stroke + " Z";
             }
             paths.push(stroke);
 
             // remove the points seen from the list of points
-            points = _.difference(points, seen);
+            points = _.difference(points, _.values(seen));
         }
-        //console.log(paths);
         return paths;
     }
 
+    // gets the outer boundary of a set of polygons
     function getHull(mesh, height) {
         // get all polygons with a height > some input
         var polys = _.filter(mesh.polys, function(poly) {

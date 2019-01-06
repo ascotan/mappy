@@ -160,18 +160,24 @@ export default {
       });
 
       // erode based on water
-      MapGenerator.Erode(mesh);
+      mesh = MapGenerator.Erode(mesh);
       this.svgContainer.select('polyline.heightmap').each(function() {
         let poly = mesh.polys[parseInt(this.data('index'))];
-        this.attr({fill: MapGenerator.ColorizeHeight(poly.height - poly.erosion)})
+        this.attr({fill: MapGenerator.ColorizeHeight(poly.height - (poly.erosion*poly.inlets))})
       });
+
+      // mesh.polys.forEach((poly) => {
+      //   if (poly.height > 0 && poly.inlets > 8) {
+      //     this.svgContainer.circle(poly.inlets*2).attr({cx: poly.centroid[0], cy: poly.centroid[1]}).fill('white');
+      //   }
+      // });
 
       // drop topgraphic lines
       for (let x = this.svgAttr.coastlineHeight; x <= MapGenerator.MaxHeight; x += this.svgAttr.topoLineHeightEvery) {
         var paths = MapGenerator.GetBoundaries(mesh, x);
 
         paths.forEach((path) => {
-          let line = this.svgContainer.path(path).stroke({width: 7, color: 'black'}).fill('none');
+          let line = this.svgContainer.path(path).stroke({width: 4, color: 'black'}).fill('none');
           if (!this.drawBoundaries) {
             line.hide();
           }

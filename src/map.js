@@ -7,6 +7,7 @@ var MapGenerator = (function() {
     var relaxIterations = 10;
     var maxHeight = 1000;
     var minHeight = -500;
+    var erosionRate = .2;
 
     function createRandomPoints(n, extent) {
         // create a random set of points
@@ -83,12 +84,17 @@ var MapGenerator = (function() {
             }
             mesh.polys.push({
                 centroid: points[index],
+                points: pnts,
                 edges: edges,
                 edgesSorted: edgesSorted,
                 height: 0,
-                erosion: 0
+                erosion: 0,
+                inlets: 0,
+                neighbors: []
             });
         })
+
+        calculatePolyNeighbors(mesh);
         return mesh;
     }
 
@@ -123,7 +129,7 @@ var MapGenerator = (function() {
         if (height < 0) {
             color = [0, 102, 255]; // blue
         } else {
-            color = [153, 102, 51]; // brown
+            color = [224, 189, 158]; // brown
         }
 
         let shade = (Math.round(125 + (125 * (height * (1/maxHeight))))/255);
@@ -160,6 +166,29 @@ var MapGenerator = (function() {
             return result;
         }, []);
         return polys
+    }
+
+    function calculatePolyNeighbors(mesh) {
+        let hash = {};
+        // calculate a list of point: [polyindex...]
+        mesh.polys.forEach((poly, index) => {
+            poly.points.forEach((point) => {
+                if (!_.has(hash, point.toString())) {
+                    hash[point.toString()] = [index];
+                } else {
+                    hash[point.toString()].push(index);
+                }
+            });
+        });
+
+        _.values(hash).forEach((group) => {
+            // this is an array of neighbors
+            group.forEach((index) => {
+                let already = mesh.polys[index].neighbors;
+                let others = _.filter(group, function(value) { return value != index;});
+                mesh.polys[index].neighbors = _.union(already, others);
+            })
+        });
     }
 
     // this function takes the polygon hull of a set of polygons and extracts SVG paths from it
@@ -269,7 +298,7 @@ var MapGenerator = (function() {
     function getHull(mesh, height) {
         // get all polygons with a height > some input
         var polys = _.filter(mesh.polys, function(poly) {
-            return (poly.height - poly.erosion) > height;
+            return (poly.height - (poly.erosion*poly.inlets)) > height;
         });
         if (polys.length == 0) {
             return [];
@@ -299,17 +328,23 @@ var MapGenerator = (function() {
        return hull;
     }
 
-    function applyWater(mesh) {
+    function applyWater(mesh, mapwidth, mapheight) {
+        // get the average size of a voroni poly and we'll find centroids 2x the radius away
+        let polySize = Math.round(Math.sqrt((mapheight * mapwidth) / mesh.polys.length));
+        let radius = 2*polySize;
         mesh.polys.forEach((poly) => {
-            let neighbors = centroidNeighbors(mesh, poly.centroid, 150);
-            neighbors.forEach((neighbor) => {
-                if (poly.height > neighbor.poly.height) {
-                    // lets say that erosion is 1/10 of the height differential
-                    let erosion = (poly.height - neighbor.poly.height) * .1;
-                    neighbor.poly.erosion = _.clamp(neighbor.poly.erosion + erosion, minHeight, maxHeight);
+            poly.neighbors.forEach((neighbor) => {
+                if (poly.height > mesh.polys[neighbor].height) {
+                    // lets say that erosion is some % of the height differential
+                    let erosion = (poly.height - mesh.polys[neighbor].height) * erosionRate;
+                    mesh.polys[neighbor].erosion =
+                        _.clamp(mesh.polys[neighbor].erosion + erosion, minHeight, maxHeight);
+                    // for every inbound erosion, increment
+                    mesh.polys[neighbor].inlets = mesh.polys[neighbor].inlets + 1;
                 }
             });
         });
+        return mesh;
     }
 
     return {
@@ -332,8 +367,8 @@ var MapGenerator = (function() {
             let hull = getHull(mesh, height);
             return polylineToPaths(hull);
         },
-        Erode: (mesh) => {
-            applyWater(mesh);
+        Erode: (mesh, width, height) => {
+            return applyWater(mesh, width, height);
         },
         ColorizeHeight: (height) => {
             return heightToColor(height);

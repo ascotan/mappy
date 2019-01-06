@@ -5,8 +5,8 @@ import {Delaunay} from "d3-delaunay";
 
 var MapGenerator = (function() {
     var relaxIterations = 10;
-    var maxHeight = 1000;
-    var minHeight = -500;
+    var bumpMaxHeight = 1000;
+    var bumpMinHeight = -1000;
     var erosionRate = .2;
 
     function createRandomPoints(n, extent) {
@@ -57,7 +57,8 @@ var MapGenerator = (function() {
         var mesh = {
             voroni: null,
             polys: [],
-            bump: false
+            maxHeight: 0,
+            minHeight: 0
         };
 
         // add all the polygons
@@ -105,26 +106,36 @@ var MapGenerator = (function() {
         // set the target height
         // to prevent massive 'maxheight' areas, invert the bumpmap
         // to give better texture
-        if (target.height == maxHeight) {
+        if (target.height >= bumpMaxHeight) {
             value = -value;
         }
-        target.height = _.clamp(target.height + value, minHeight, maxHeight);
+        target.height = target.height + value;
+        if (target.height > mesh.maxHeight) {
+            mesh.maxHeight = target.height;
+        }
+        if (target.minHeight < mesh.minHeight) {
+            mesh.minHeight = target.height;
+        }
 
         var neighbors = centroidNeighbors(mesh, target.centroid, radius);
         // for every neighbor in the radius, get their new height
         neighbors.forEach((neighbor) => {
             let height = sigmoidDistance(neighbor.distance, radius) * value;
             // make sure to add the new height to the height they already have
-            neighbor.poly.height = _.clamp(neighbor.poly.height + height, minHeight, maxHeight);
+            neighbor.poly.height = neighbor.poly.height + height;
+            if (neighbor.poly.height > mesh.maxHeight) {
+                mesh.maxHeight = neighbor.poly.height;
+            }
+            if (neighbor.poly.minHeight < mesh.minHeight) {
+                mesh.minHeight = neighbor.poly.height;
+            }
         });
-        target.bump = true;
         return mesh
     }
 
     // get a hex color from a height
     // assumes that heights are clamped to -1000 to 1000
-    function heightToColor(height) {
-        height = _.clamp(height, minHeight, maxHeight);
+    function heightToColor(height, min, max) {
         var color = [];
         if (height < 0) {
             color = [0, 102, 255]; // blue
@@ -132,7 +143,7 @@ var MapGenerator = (function() {
             color = [224, 189, 158]; // brown
         }
 
-        let shade = (Math.round(125 + (125 * (height * (1/maxHeight))))/255);
+        let shade = (Math.round(125 + (125 * (height * (1/max))))/255);
         let hex = "#";
         color.forEach((component) => {
             component = Math.round(component * shade);
@@ -329,16 +340,13 @@ var MapGenerator = (function() {
     }
 
     function applyWater(mesh, mapwidth, mapheight) {
-        // get the average size of a voroni poly and we'll find centroids 2x the radius away
-        let polySize = Math.round(Math.sqrt((mapheight * mapwidth) / mesh.polys.length));
-        let radius = 2*polySize;
         mesh.polys.forEach((poly) => {
             poly.neighbors.forEach((neighbor) => {
                 if (poly.height > mesh.polys[neighbor].height) {
                     // lets say that erosion is some % of the height differential
                     let erosion = (poly.height - mesh.polys[neighbor].height) * erosionRate;
-                    mesh.polys[neighbor].erosion =
-                        _.clamp(mesh.polys[neighbor].erosion + erosion, minHeight, maxHeight);
+                    mesh.polys[neighbor].erosion = mesh.polys[neighbor].erosion + erosion;
+
                     // for every inbound erosion, increment
                     mesh.polys[neighbor].inlets = mesh.polys[neighbor].inlets + 1;
                 }
@@ -348,7 +356,6 @@ var MapGenerator = (function() {
     }
 
     return {
-        MaxHeight: maxHeight,
         GeneratePoints: (number, extent) => {
             return relaxPoints(
                 createRandomPoints(number, extent), extent);
@@ -359,7 +366,7 @@ var MapGenerator = (function() {
         GenerateHeightMap: (mesh, bumps, maxRadius, minRadius) => {
             // bumps are fine for now - heightmap can be improve bigtime
             for (let x = 0; x < bumps; x++) {
-              mesh = addBump(mesh, _.random(maxRadius, minRadius), _.random(minHeight, maxHeight));
+              mesh = addBump(mesh, _.random(maxRadius, minRadius), _.random(bumpMinHeight, bumpMaxHeight));
             }
             return mesh;
         },
@@ -370,8 +377,8 @@ var MapGenerator = (function() {
         Erode: (mesh, width, height) => {
             return applyWater(mesh, width, height);
         },
-        ColorizeHeight: (height) => {
-            return heightToColor(height);
+        ColorizeHeight: (height, min, max) => {
+            return heightToColor(height, min, max);
         }
     }
 

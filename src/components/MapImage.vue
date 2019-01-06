@@ -36,7 +36,7 @@ export default {
       svgAttr: {
         viewBoxWidth: 3300,
         viewBoxHeight: 2550,
-        polys: 5000,
+        polys: 7500,
         bumpmap: {
           bumps: 50,
           minRadius: 100,
@@ -146,7 +146,7 @@ export default {
       mesh = MapGenerator.GenerateHeightMap(mesh, this.svgAttr.bumpmap.bumps, this.svgAttr.bumpmap.minRadius, this.svgAttr.bumpmap.maxRadius);
       // draw the voroni diagram + heighmap
       mesh.polys.forEach((poly, index) => {
-        let line = this.svgContainer.polyline(_.flatten(poly.edges)).fill(MapGenerator.ColorizeHeight(poly.height)).addClass('heightmap').data({'index': index});
+        let line = this.svgContainer.polyline(_.flatten(poly.edges)).fill(MapGenerator.ColorizeHeight(poly.height, mesh.minHeight, mesh.maxHeight)).addClass('heightmap').data({'index': index});
         if (!this.drawHeightMap) {
           line.hide();
         }
@@ -163,7 +163,7 @@ export default {
       mesh = MapGenerator.Erode(mesh);
       this.svgContainer.select('polyline.heightmap').each(function() {
         let poly = mesh.polys[parseInt(this.data('index'))];
-        this.attr({fill: MapGenerator.ColorizeHeight(poly.height - (poly.erosion*poly.inlets))})
+        this.attr({fill: MapGenerator.ColorizeHeight(poly.height - (poly.erosion*poly.inlets), mesh.minHeight, mesh.maxHeight)})
       });
 
       // mesh.polys.forEach((poly) => {
@@ -173,7 +173,7 @@ export default {
       // });
 
       // drop topgraphic lines
-      for (let x = this.svgAttr.coastlineHeight; x <= MapGenerator.MaxHeight; x += this.svgAttr.topoLineHeightEvery) {
+      for (let x = this.svgAttr.coastlineHeight; x <= mesh.maxHeight; x += this.svgAttr.topoLineHeightEvery) {
         var paths = MapGenerator.GetBoundaries(mesh, x);
 
         paths.forEach((path) => {
